@@ -1,0 +1,132 @@
+name: Build ImmortalWrt
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_file:
+        description: "Seed config path"
+        required: true
+        default: "build-config/seed.config"
+      upload_release:
+        description: "Upload firmware to GitHub Release"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+  schedule:
+    - cron: "0 20 * * 5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-openwrt-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+  CONFIG_FILE: build-config/seed.config
+  PACKAGES_FILE: build-config/packages.config
+  DIY_SCRIPT: build-config/diy.sh
+  UPLOAD_RELEASE: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set build inputs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "CONFIG_FILE=${{ inputs.config_file }}" >> "$GITHUB_ENV"
+            echo "UPLOAD_RELEASE=${{ inputs.upload_release }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext \
+            gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool \
+            lib32gcc-s1 libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+            libmpc-dev libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev \
+            libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build \
+            p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig \
+            texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+
+      - name: Update feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Run custom script
+        run: |
+          if [ -f "$DIY_SCRIPT" ]; then
+            chmod +x "$DIY_SCRIPT"
+            "$DIY_SCRIPT"
+          fi
+
+      - name: Generate config
+        run: |
+          cp "$CONFIG_FILE" .config
+          if [ -f "$PACKAGES_FILE" ]; then
+            cat "$PACKAGES_FILE" >> .config
+          fi
+          make defconfig
+          ./scripts/diffconfig.sh > build-config/final.diffconfig
+          cat build-config/final.diffconfig
+
+      - name: Download sources
+        run: make download -j"$(nproc)" V=s
+
+      - name: Build firmware
+        run: make -j"$(nproc)" V=s
+
+      - name: Collect firmware
+        run: |
+          mkdir -p firmware
+          find bin/targets -type f \( -name "*.bin" -o -name "*.img" -o -name "*.itb" -o -name "*.ubi" -o -name "*.manifest" -o -name "*.buildinfo" \) -exec cp -v {} firmware/ \;
+          tar -C firmware -czf immortalwrt-firmware.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-firmware
+          path: |
+            firmware
+            build-config/final.diffconfig
+          retention-days: 14
+
+      - name: Create release
+        if: env.UPLOAD_RELEASE == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: immortalwrt-${{ github.run_number }}
+          name: ImmortalWrt ${{ github.run_number }}
+          body: |
+            Source: ${{ github.sha }}
+            Config: ${{ env.CONFIG_FILE }}
+          files: |
+            immortalwrt-firmware.tar.gz
+            build-config/final.diffconfig
+
