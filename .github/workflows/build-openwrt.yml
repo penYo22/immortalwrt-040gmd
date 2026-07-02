@@ -3,8 +3,16 @@ name: Build ImmortalWrt
 on:
   workflow_dispatch:
     inputs:
+      source_repo:
+        description: "ImmortalWrt source repository"
+        required: true
+        default: "https://github.com/bingoguo93/immortalwrt.git"
+      source_branch:
+        description: "ImmortalWrt source branch"
+        required: true
+        default: "6.18"
       config_file:
-        description: "Seed config path"
+        description: "Seed config path in this repo"
         required: true
         default: "build-config/seed.config"
       upload_release:
@@ -23,10 +31,13 @@ permissions:
 
 concurrency:
   group: build-openwrt-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   TZ: Asia/Shanghai
+  SOURCE_REPO: https://github.com/bingoguo93/immortalwrt.git
+  SOURCE_BRANCH: "6.18"
+  SOURCE_DIR: immortalwrt-25.12
   CONFIG_FILE: build-config/seed.config
   PACKAGES_FILE: build-config/packages.config
   DIY_SCRIPT: build-config/diy.sh
@@ -37,6 +48,15 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Set build inputs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "SOURCE_REPO=${{ inputs.source_repo }}" >> "$GITHUB_ENV"
+            echo "SOURCE_BRANCH=${{ inputs.source_branch }}" >> "$GITHUB_ENV"
+            echo "CONFIG_FILE=${{ inputs.config_file }}" >> "$GITHUB_ENV"
+            echo "UPLOAD_RELEASE=${{ inputs.upload_release }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -48,17 +68,11 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: Checkout source
+      - name: Checkout build config
         uses: actions/checkout@v4
         with:
+          path: config-repo
           fetch-depth: 1
-
-      - name: Set build inputs
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "CONFIG_FILE=${{ inputs.config_file }}" >> "$GITHUB_ENV"
-            echo "UPLOAD_RELEASE=${{ inputs.upload_release }}" >> "$GITHUB_ENV"
-          fi
 
       - name: Install build dependencies
         run: |
@@ -74,12 +88,19 @@ jobs:
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig \
             texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
+      - name: Clone ImmortalWrt source
+        run: |
+          git clone --depth=1 --single-branch --branch="$SOURCE_BRANCH" "$SOURCE_REPO" "$SOURCE_DIR"
+          cp -a config-repo/build-config "$SOURCE_DIR/build-config"
+
       - name: Update feeds
+        working-directory: ${{ env.SOURCE_DIR }}
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Run custom script
+        working-directory: ${{ env.SOURCE_DIR }}
         run: |
           if [ -f "$DIY_SCRIPT" ]; then
             chmod +x "$DIY_SCRIPT"
@@ -87,6 +108,7 @@ jobs:
           fi
 
       - name: Generate config
+        working-directory: ${{ env.SOURCE_DIR }}
         run: |
           cp "$CONFIG_FILE" .config
           if [ -f "$PACKAGES_FILE" ]; then
@@ -97,24 +119,32 @@ jobs:
           cat build-config/final.diffconfig
 
       - name: Download sources
-        run: make download -j"$(nproc)" V=s
+        working-directory: ${{ env.SOURCE_DIR }}
+        run: |
+          make download -j"$(nproc)" V=s
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-      - name: Build firmware
+      - name: Compile firmware
+        working-directory: ${{ env.SOURCE_DIR }}
         run: make -j"$(nproc)" V=s
 
       - name: Collect firmware
+        working-directory: ${{ env.SOURCE_DIR }}
         run: |
-          mkdir -p firmware
-          find bin/targets -type f \( -name "*.bin" -o -name "*.img" -o -name "*.itb" -o -name "*.ubi" -o -name "*.manifest" -o -name "*.buildinfo" \) -exec cp -v {} firmware/ \;
-          tar -C firmware -czf immortalwrt-firmware.tar.gz .
+          mkdir -p ../firmware
+          find bin/targets -type f \( \
+            -name "*.bin" -o -name "*.img" -o -name "*.itb" -o -name "*.ubi" \
+            -o -name "*.manifest" -o -name "*.buildinfo" -o -name "*.json" \
+          \) -exec cp -v {} ../firmware/ \;
+          cp build-config/final.diffconfig ../firmware/final.diffconfig
+          tar -C ../firmware -czf ../immortalwrt-firmware.tar.gz .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: immortalwrt-firmware
-          path: |
-            firmware
-            build-config/final.diffconfig
+          path: firmware
           retention-days: 14
 
       - name: Create release
@@ -124,9 +154,11 @@ jobs:
           tag_name: immortalwrt-${{ github.run_number }}
           name: ImmortalWrt ${{ github.run_number }}
           body: |
-            Source: ${{ github.sha }}
-            Config: ${{ env.CONFIG_FILE }}
+            Source repo: ${{ env.SOURCE_REPO }}
+            Source branch: ${{ env.SOURCE_BRANCH }}
+            Config repo commit: ${{ github.sha }}
+            Config file: ${{ env.CONFIG_FILE }}
           files: |
             immortalwrt-firmware.tar.gz
-            build-config/final.diffconfig
+            firmware/final.diffconfig
 
