@@ -16,6 +16,9 @@ Files:
 - `diy.sh`: optional commands that run before `.config` is generated.
   It currently fetches third-party packages such as `luci-app-airoha-npu`
   and `luci-app-gecoosac`.
+- `files/`: files copied into the firmware root filesystem.
+  `files/etc/uci-defaults/99-enable-hw-flow-offloading` enables hardware
+  flow offloading by default. It is not fully compatible with QoS/SQM.
 
 The default target is `airoha/an7581` with device profile
 `bell_xg-040g-md`.
