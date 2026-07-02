@@ -9,11 +9,28 @@ the source with:
 git clone --depth=1 --single-branch --branch=6.18 https://github.com/bingoguo93/immortalwrt.git immortalwrt-25.12
 ```
 
+Files:
+
 - `seed.config`: target platform and base firmware options.
-- `packages.config`: LuCI apps and other packages you want to add or remove.
+- `packages.config`: LuCI apps and other packages to add or remove.
 - `diy.sh`: optional commands that run before `.config` is generated.
 
-The default target is `airoha/an7581`.
+The default target is `airoha/an7581` with device profile
+`bell_xg-040g-md`.
+
+Release assets are prefixed with:
+
+```text
+immortalwrt-airoha-an7581-bell_xg-040g-md
+```
+
+The factory image is also packed as:
+
+```text
+immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.zip
+```
+
+Unzip it to get the `.bin` firmware file.
 
 To add a plugin, append a line such as:
 
@@ -29,6 +46,3 @@ To remove a package, append a line such as:
 
 After editing, open **Actions -> Build ImmortalWrt -> Run workflow**.
 
-When `upload_release` is enabled, the workflow creates a Release named by
-build time, includes target/platform/login/plugin information in the Release
-body, and uploads firmware files plus build metadata.
