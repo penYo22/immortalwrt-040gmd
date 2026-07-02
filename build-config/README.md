@@ -14,6 +14,8 @@ Files:
 - `seed.config`: target platform and base firmware options.
 - `packages.config`: LuCI apps and other packages to add or remove.
 - `diy.sh`: optional commands that run before `.config` is generated.
+  It currently fetches third-party packages such as `luci-app-airoha-npu`
+  and `luci-app-gecoosac`.
 
 The default target is `airoha/an7581` with device profile
 `bell_xg-040g-md`.
