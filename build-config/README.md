@@ -30,7 +30,13 @@ The factory image is also packed as:
 immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.zip
 ```
 
-Unzip it to get the `.bin` firmware file.
+The sysupgrade image is packed as:
+
+```text
+immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-sysupgrade.zip
+```
+
+Unzip either archive to get the `.bin` firmware file.
 
 To add a plugin, append a line such as:
 
@@ -45,4 +51,3 @@ To remove a package, append a line such as:
 ```
 
 After editing, open **Actions -> Build ImmortalWrt -> Run workflow**.
-
