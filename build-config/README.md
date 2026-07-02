@@ -18,25 +18,12 @@ Files:
 The default target is `airoha/an7581` with device profile
 `bell_xg-040g-md`.
 
-Release assets are prefixed with:
+Release assets are limited to two `.bin` firmware files:
 
 ```text
-immortalwrt-airoha-an7581-bell_xg-040g-md
+immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.bin
+immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-sysupgrade.bin
 ```
-
-The factory image is also packed as:
-
-```text
-immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.zip
-```
-
-The sysupgrade image is packed as:
-
-```text
-immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-sysupgrade.zip
-```
-
-Unzip either archive to get the `.bin` firmware file.
 
 To add a plugin, append a line such as:
 
