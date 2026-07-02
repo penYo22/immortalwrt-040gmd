@@ -163,9 +163,11 @@ jobs:
           if [ "${#sysupgrade_bins[@]}" -eq 0 ]; then
             mapfile -t sysupgrade_bins < <(find ../firmware -maxdepth 1 -type f -iname "*sysupgrade*.bin" | sort)
           fi
-          if [ "${#sysupgrade_bins[@]}" -gt 0 ]; then
-            zip -j "../release-assets/${SYSUPGRADE_ZIP}" "${sysupgrade_bins[@]}"
+          if [ "${#sysupgrade_bins[@]}" -eq 0 ]; then
+            echo "No sysupgrade .bin image was found for ${DEVICE_MODEL}." >&2
+            exit 1
           fi
+          zip -j "../release-assets/${SYSUPGRADE_ZIP}" "${sysupgrade_bins[@]}"
 
           for asset in ../firmware/*; do
             [ -f "$asset" ] || continue
@@ -219,7 +221,7 @@ jobs:
             echo
             echo "### 下载说明"
             echo "- ${FACTORY_ZIP}: factory 固件压缩包，解压后获得 .bin 固件文件。"
-            echo "- ${SYSUPGRADE_ZIP}: sysupgrade 固件压缩包，如源码产物包含该文件则会上传。"
+            echo "- ${SYSUPGRADE_ZIP}: sysupgrade 固件压缩包，解压后获得 .bin 固件文件。"
             echo "- ${RELEASE_PREFIX}-all-artifacts.tar.gz: 全部固件产物和编译元数据。"
             echo "- 其他附件为原始编译产物，文件名统一带 ${RELEASE_PREFIX} 前缀。"
           } > release-body.md
