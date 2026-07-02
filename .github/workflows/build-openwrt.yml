@@ -39,8 +39,14 @@ env:
   SOURCE_BRANCH: "6.18"
   SOURCE_DIR: immortalwrt-25.12
   TARGET_PLATFORM: airoha/an7581
+  PLATFORM_TYPE: airoha
+  CPU: an7581
   DEVICE_NAME: 040GMD
+  DEVICE_MODEL: bell_xg-040g-md
   LAN_IP: 192.168.1.1
+  RELEASE_PREFIX: immortalwrt-airoha-an7581-bell_xg-040g-md
+  FACTORY_ZIP: immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.zip
+  SYSUPGRADE_ZIP: immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-sysupgrade.zip
   CONFIG_FILE: build-config/seed.config
   PACKAGES_FILE: build-config/packages.config
   DIY_SCRIPT: build-config/diy.sh
@@ -89,7 +95,7 @@ jobs:
             libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build \
             p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig \
-            texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+            texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zip zlib1g-dev zstd
 
       - name: Clone ImmortalWrt source
         run: |
@@ -135,14 +141,40 @@ jobs:
       - name: Collect firmware
         working-directory: ${{ env.SOURCE_DIR }}
         run: |
-          mkdir -p ../firmware
+          mkdir -p ../firmware ../release-assets
           find bin/targets -type f \( \
             -name "*.bin" -o -name "*.img" -o -name "*.itb" -o -name "*.ubi" \
             -o -name "*.manifest" -o -name "*.buildinfo" -o -name "*.json" \
             -o -name "sha256sums" \
           \) -exec cp -v {} ../firmware/ \;
           cp build-config/final.diffconfig ../firmware/final.diffconfig
-          tar -C ../firmware -czf ../immortalwrt-firmware.tar.gz .
+
+          tar -C ../firmware -czf "../release-assets/${RELEASE_PREFIX}-all-artifacts.tar.gz" .
+
+          mapfile -t factory_bins < <(find ../firmware -maxdepth 1 -type f -iname "*${DEVICE_MODEL}*factory*.bin" | sort)
+          if [ "${#factory_bins[@]}" -eq 0 ]; then
+            mapfile -t factory_bins < <(find ../firmware -maxdepth 1 -type f -iname "*factory*.bin" | sort)
+          fi
+          if [ "${#factory_bins[@]}" -gt 0 ]; then
+            zip -j "../release-assets/${FACTORY_ZIP}" "${factory_bins[@]}"
+          fi
+
+          mapfile -t sysupgrade_bins < <(find ../firmware -maxdepth 1 -type f -iname "*${DEVICE_MODEL}*sysupgrade*.bin" | sort)
+          if [ "${#sysupgrade_bins[@]}" -eq 0 ]; then
+            mapfile -t sysupgrade_bins < <(find ../firmware -maxdepth 1 -type f -iname "*sysupgrade*.bin" | sort)
+          fi
+          if [ "${#sysupgrade_bins[@]}" -gt 0 ]; then
+            zip -j "../release-assets/${SYSUPGRADE_ZIP}" "${sysupgrade_bins[@]}"
+          fi
+
+          for asset in ../firmware/*; do
+            [ -f "$asset" ] || continue
+            base="$(basename "$asset")"
+            case "$base" in
+              ${RELEASE_PREFIX}*) cp "$asset" "../release-assets/$base" ;;
+              *) cp "$asset" "../release-assets/${RELEASE_PREFIX}-${base}" ;;
+            esac
+          done
 
       - name: Generate release notes
         run: |
@@ -162,6 +194,9 @@ jobs:
             echo "## ${DEVICE_NAME} ImmortalWrt"
             echo
             echo "- 目标平台: ${TARGET_PLATFORM}"
+            echo "- 平台类型: ${PLATFORM_TYPE}"
+            echo "- CPU: ${CPU}"
+            echo "- 设备型号: ${DEVICE_MODEL}"
             echo "- 管理地址: ${LAN_IP}"
             echo "- 内核版本: ${KERNEL_VERSION}"
             echo "- 默认用户: root"
@@ -177,21 +212,25 @@ jobs:
             echo "- 编译时间: ${BUILD_TIME} ${TZ}"
             echo
             echo "### 主要插件"
-            echo "#### luci-app 系列"
+            echo "#### luci-app 软件包"
             grep -E '^CONFIG_PACKAGE_luci-app-.+=y$' firmware/final.diffconfig \
               | sed -E 's/^CONFIG_PACKAGE_(luci-app-[^=]+)=y$/- \1/' \
               | sort -u || true
             echo
-            echo "### 附件说明"
-            echo "- 固件文件、manifest、buildinfo、profiles.json、sha256sums 会单独上传。"
-            echo "- immortalwrt-firmware.tar.gz 是全部产物的打包归档。"
+            echo "### 下载说明"
+            echo "- ${FACTORY_ZIP}: factory 固件压缩包，解压后获得 .bin 固件文件。"
+            echo "- ${SYSUPGRADE_ZIP}: sysupgrade 固件压缩包，如源码产物包含该文件则会上传。"
+            echo "- ${RELEASE_PREFIX}-all-artifacts.tar.gz: 全部固件产物和编译元数据。"
+            echo "- 其他附件为原始编译产物，文件名统一带 ${RELEASE_PREFIX} 前缀。"
           } > release-body.md
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: immortalwrt-firmware
-          path: firmware
+          path: |
+            firmware
+            release-assets
           retention-days: 14
 
       - name: Create release
@@ -201,6 +240,4 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_NAME }}
           body_path: release-body.md
-          files: |
-            immortalwrt-firmware.tar.gz
-            firmware/*
+          files: release-assets/*
