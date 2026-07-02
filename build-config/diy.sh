@@ -16,3 +16,7 @@ cp -a /tmp/small-package/luci-app-gecoosac package/custom/
 if [ -d /tmp/small-package/gecoosac ]; then
   cp -a /tmp/small-package/gecoosac package/custom/
 fi
+
+if [ -d build-config/files ]; then
+  cp -a build-config/files/. files/
+fi
