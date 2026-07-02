@@ -38,6 +38,9 @@ env:
   SOURCE_REPO: https://github.com/bingoguo93/immortalwrt.git
   SOURCE_BRANCH: "6.18"
   SOURCE_DIR: immortalwrt-25.12
+  TARGET_PLATFORM: airoha/an7581
+  DEVICE_NAME: 040GMD
+  LAN_IP: 192.168.1.1
   CONFIG_FILE: build-config/seed.config
   PACKAGES_FILE: build-config/packages.config
   DIY_SCRIPT: build-config/diy.sh
@@ -136,9 +139,53 @@ jobs:
           find bin/targets -type f \( \
             -name "*.bin" -o -name "*.img" -o -name "*.itb" -o -name "*.ubi" \
             -o -name "*.manifest" -o -name "*.buildinfo" -o -name "*.json" \
+            -o -name "sha256sums" \
           \) -exec cp -v {} ../firmware/ \;
           cp build-config/final.diffconfig ../firmware/final.diffconfig
           tar -C ../firmware -czf ../immortalwrt-firmware.tar.gz .
+
+      - name: Generate release notes
+        run: |
+          BUILD_TIME="$(date +'%Y.%m.%d-%H%M')"
+          echo "RELEASE_TAG=$BUILD_TIME" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=$BUILD_TIME" >> "$GITHUB_ENV"
+
+          KERNEL_VERSION="$(find firmware -name '*.buildinfo' -print -quit | xargs -r grep -E '^kernel_version=' | head -n1 | cut -d= -f2-)"
+          if [ -z "$KERNEL_VERSION" ]; then
+            KERNEL_VERSION="$(grep -E '^CONFIG_LINUX_[0-9_]+=y' firmware/final.diffconfig | head -n1 | sed -E 's/CONFIG_LINUX_([0-9]+)_([0-9]+).*/\1.\2/')"
+          fi
+          if [ -z "$KERNEL_VERSION" ]; then
+            KERNEL_VERSION="6.18"
+          fi
+
+          {
+            echo "## ${DEVICE_NAME} ImmortalWrt"
+            echo
+            echo "- 目标平台: ${TARGET_PLATFORM}"
+            echo "- 管理地址: ${LAN_IP}"
+            echo "- 内核版本: ${KERNEL_VERSION}"
+            echo "- 默认用户: root"
+            echo "- 默认密码: 空"
+            echo
+            echo "### 编译信息"
+            echo "- 源码仓库: ${SOURCE_REPO}"
+            echo "- 源码分支: ${SOURCE_BRANCH}"
+            echo "- 配置仓库: ${GITHUB_REPOSITORY}"
+            echo "- 配置提交: ${GITHUB_SHA}"
+            echo "- 配置文件: ${CONFIG_FILE}"
+            echo "- 插件文件: ${PACKAGES_FILE}"
+            echo "- 编译时间: ${BUILD_TIME} ${TZ}"
+            echo
+            echo "### 主要插件"
+            echo "#### luci-app 系列"
+            grep -E '^CONFIG_PACKAGE_luci-app-.+=y$' firmware/final.diffconfig \
+              | sed -E 's/^CONFIG_PACKAGE_(luci-app-[^=]+)=y$/- \1/' \
+              | sort -u || true
+            echo
+            echo "### 附件说明"
+            echo "- 固件文件、manifest、buildinfo、profiles.json、sha256sums 会单独上传。"
+            echo "- immortalwrt-firmware.tar.gz 是全部产物的打包归档。"
+          } > release-body.md
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -151,14 +198,9 @@ jobs:
         if: env.UPLOAD_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: immortalwrt-${{ github.run_number }}
-          name: ImmortalWrt ${{ github.run_number }}
-          body: |
-            Source repo: ${{ env.SOURCE_REPO }}
-            Source branch: ${{ env.SOURCE_BRANCH }}
-            Config repo commit: ${{ github.sha }}
-            Config file: ${{ env.CONFIG_FILE }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release-body.md
           files: |
             immortalwrt-firmware.tar.gz
-            firmware/final.diffconfig
-
+            firmware/*
