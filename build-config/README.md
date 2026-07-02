@@ -28,3 +28,7 @@ To remove a package, append a line such as:
 ```
 
 After editing, open **Actions -> Build ImmortalWrt -> Run workflow**.
+
+When `upload_release` is enabled, the workflow creates a Release named by
+build time, includes target/platform/login/plugin information in the Release
+body, and uploads firmware files plus build metadata.
