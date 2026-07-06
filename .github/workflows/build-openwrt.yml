@@ -207,6 +207,11 @@ jobs:
             grep -E '^CONFIG_PACKAGE_luci-app-.+=y$' firmware/final.diffconfig \
               | sed -E 's/^CONFIG_PACKAGE_(luci-app-[^=]+)=y$/- \1/' \
               | sort -u || true
+            echo
+            echo "#### NPU 软件包"
+            grep -Ei '^CONFIG_PACKAGE_[^=]*npu[^=]*=y$' firmware/final.diffconfig \
+              | sed -E 's/^CONFIG_PACKAGE_([^=]+)=y$/- \1/' \
+              | sort -u || true
           } > release-body.md
 
       - name: Upload artifact
@@ -226,4 +231,3 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           body_path: release-body.md
           files: release-assets/*
-

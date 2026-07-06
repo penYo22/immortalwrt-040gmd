@@ -1,0 +1,13 @@
+#!/bin/sh
+
+feeds="/etc/opkg/distfeeds.conf"
+mirror="https://mirrors.ustc.edu.cn/immortalwrt"
+
+if [ -f "$feeds" ]; then
+	sed -i \
+		-e "s#https\?://downloads.immortalwrt.org#${mirror}#g" \
+		-e "s#https\?://mirrors.vsean.net/openwrt#${mirror}#g" \
+		"$feeds"
+fi
+
+exit 0
