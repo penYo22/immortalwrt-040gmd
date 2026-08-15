@@ -42,10 +42,10 @@ env:
   PLATFORM_TYPE: airoha
   CPU: an7581
   DEVICE_NAME: 040GMD
-  DEVICE_MODEL: bell_xg-040g-md
+  DEVICE_MODEL: nokia_xg-040g-md
   LAN_IP: 192.168.1.1
-  FACTORY_BIN: immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-factory.bin
-  SYSUPGRADE_BIN: immortalwrt-airoha-an7581-bell_xg-040g-md-squashfs-sysupgrade.bin
+  FACTORY_BIN: immortalwrt-airoha-an7581-nokia_xg-040g-md-squashfs-factory.bin
+  SYSUPGRADE_BIN: immortalwrt-airoha-an7581-nokia_xg-040g-md-squashfs-sysupgrade.bin
   CONFIG_FILE: build-config/seed.config
   PACKAGES_FILE: build-config/packages.config
   DIY_SCRIPT: build-config/diy.sh
@@ -125,6 +125,10 @@ jobs:
           make defconfig
           ./scripts/diffconfig.sh > build-config/final.diffconfig
           cat build-config/final.diffconfig
+          grep -q "DEVICE_${DEVICE_MODEL}=y" build-config/final.diffconfig || {
+            echo "::error::Target device ${DEVICE_MODEL} not found in source tree (renamed upstream?). Update DEVICE_MODEL in seed.config and workflow env."
+            exit 1
+          }
 
       - name: Download sources
         working-directory: ${{ env.SOURCE_DIR }}
