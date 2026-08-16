@@ -136,7 +136,12 @@ jobs:
               \#*|"") continue ;;
               CONFIG_PACKAGE_*=y)
                 sym="${line%%=*}"
-                grep -q "^${sym}=y" .config || dropped="${dropped} ${sym#CONFIG_PACKAGE_}"
+                if ! grep -q "^${sym}=y" .config; then
+                  pkg="${sym#CONFIG_PACKAGE_}"
+                  dropped="${dropped} ${pkg}"
+                  echo "--- ${pkg} 未生效,构建系统记录的依赖如下 ---"
+                  awk -v p="${pkg}" '$0=="Package: "p{f=1;next} f&&/^Depends:/{print;exit} f&&/^$/{f=0}' tmp/info/.packageinfo 2>/dev/null || true
+                fi
                 ;;
             esac
           done < <(cat "$CONFIG_FILE" "$PACKAGES_FILE" 2>/dev/null)

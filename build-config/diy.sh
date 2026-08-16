@@ -10,16 +10,20 @@ git clone --depth=1 https://github.com/rchen14b/luci-app-airoha-npu.git \
 sed -i 's|include ../../luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' \
   package/custom/luci-app-airoha-npu/Makefile
 
+# gecoosac:kenzok8/small-package 已移除核心包,改用 lyin888/openwrt-gecoosac(核心+界面齐全)
+git clone --depth=1 https://github.com/lyin888/openwrt-gecoosac.git /tmp/openwrt-gecoosac
+cp -a /tmp/openwrt-gecoosac/gecoosac package/custom/
+cp -a /tmp/openwrt-gecoosac/luci-app-gecoosac package/custom/
+
+# unblockneteasemusic:luci feed 版被 defconfig 丢弃,改用 kenzok8 自包含版(界面+Node 版核心)
 git clone --depth=1 --filter=blob:none --sparse https://github.com/kenzok8/small-package.git \
   /tmp/small-package
 (
   cd /tmp/small-package
-  git sparse-checkout set luci-app-gecoosac gecoosac || git sparse-checkout set luci-app-gecoosac
+  git sparse-checkout set luci-app-unblockneteasemusic UnblockNeteaseMusic
 )
-cp -a /tmp/small-package/luci-app-gecoosac package/custom/
-if [ -d /tmp/small-package/gecoosac ]; then
-  cp -a /tmp/small-package/gecoosac package/custom/
-fi
+cp -a /tmp/small-package/luci-app-unblockneteasemusic package/custom/
+cp -a /tmp/small-package/UnblockNeteaseMusic package/custom/
 
 if [ -d build-config/files ]; then
   cp -a build-config/files/. files/
