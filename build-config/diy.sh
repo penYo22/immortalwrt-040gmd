@@ -3,6 +3,10 @@ set -euo pipefail
 
 mkdir -p package/custom
 
+# an7581 target 只声明了 FEATURES+=pwm,缺少 fpu(cortex-a53 实际有硬件FPU)。
+# HAS_FPU 为假会导致 node 及依赖 node 的包(UnblockNeteaseMusic 等)被 kconfig 静默隐藏。
+sed -i 's/^FEATURES+=pwm$/FEATURES+=pwm fpu/' target/linux/airoha/an7581/target.mk
+
 git clone --depth=1 https://github.com/rchen14b/luci-app-airoha-npu.git \
   package/custom/luci-app-airoha-npu
 # 该仓库 Makefile 用相对路径 include ../../luci.mk,只在 luci feed 目录内有效;
