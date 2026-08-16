@@ -130,6 +130,18 @@ jobs:
             exit 1
           }
 
+          dropped=""
+          while IFS= read -r line; do
+            case "$line" in
+              \#*|"") continue ;;
+              CONFIG_PACKAGE_*=y)
+                sym="${line%%=*}"
+                grep -q "^${sym}=y" .config || dropped="${dropped} ${sym#CONFIG_PACKAGE_}"
+                ;;
+            esac
+          done < <(cat "$CONFIG_FILE" "$PACKAGES_FILE" 2>/dev/null)
+          [ -z "$dropped" ] || echo "::warning::以下请求的软件包未生效(可能已被上游改名或删除):${dropped}"
+
       - name: Download sources
         working-directory: ${{ env.SOURCE_DIR }}
         run: |

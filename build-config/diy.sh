@@ -5,6 +5,10 @@ mkdir -p package/custom
 
 git clone --depth=1 https://github.com/rchen14b/luci-app-airoha-npu.git \
   package/custom/luci-app-airoha-npu
+# 该仓库 Makefile 用相对路径 include ../../luci.mk,只在 luci feed 目录内有效;
+# 克隆到 package/custom/ 下需改为绝对路径,否则包无法被构建系统识别
+sed -i 's|include ../../luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' \
+  package/custom/luci-app-airoha-npu/Makefile
 
 git clone --depth=1 --filter=blob:none --sparse https://github.com/kenzok8/small-package.git \
   /tmp/small-package
